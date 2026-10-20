@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모바일 뱅킹 시뮬레이터</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        * {
+            font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* 스크롤바 스타일링 */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.3);
+            border-radius: 4px;
+        }
+        /* 거래 발생 시 계좌 카드 반짝임 효과 */
+        .glow-green {
+            animation: pulse-green 0.6s ease-out;
+        }
+        .glow-red {
+            animation: pulse-red 0.6s ease-out;
+        }
+        @keyframes pulse-green {
+            0% { background-color: rgba(16, 185, 129, 0.25); }
+            100% { background-color: transparent; }
+        }
+        @keyframes pulse-red {
+            0% { background-color: rgba(239, 68, 68, 0.25); }
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-0 md:p-4">
+
+    <!-- 모바일 스크린 프레임 -->
+    <div id="app" class="w-full max-w-md h-screen md:h-[880px] bg-slate-950 md:rounded-[40px] shadow-2xl flex flex-col overflow-hidden relative border-0 md:border-8 border-slate-800">
+
+        <!-- 초기 시작 설정 모달 -->
+        <div id="setupModal" class="absolute inset-0 bg-slate-950 z-50 flex flex-col justify-between p-6 overflow-y-auto">
+            <div class="mt-8">
+                <div class="flex items-center space-x-2 text-blue-500 font-bold text-xl mb-6">
+                    <i data-lucide="wallet" class="w-7 h-7"></i>
+                    <span>스마트 모바일 뱅킹</span>
+                </div>
+                <h1 class="text-2xl font-bold text-white mb-2">반갑습니다! 👋</h1>
+                <p class="text-slate-400 text-sm mb-8">사용자 이름과 주거래 은행을 선택해주세요.</p>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1.5">사용자 이름</label>
+                        <input type="text" id="inputUserName" placeholder="예: 홍길동" value="한윤성" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-blue-500 text-sm transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2">주거래 은행 선택</label>
+                        <div id="bankGrid" class="grid grid-cols-2 gap-2.5">
+                            <!-- 은행 목록이 JS로 동적 생성됩니다 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="completeSetup()" class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold py-4 rounded-2xl shadow-lg shadow-blue-600/30 transition text-base mt-6">
+                뱅킹 시작하기
+            </button>
+        </div>
+
+        <!-- 앱 헤더 -->
+        <header class="bg-slate-950/80 backdrop-blur-md px-5 pt-4 pb-3 flex items-center justify-between border-b border-slate-800/50 sticky top-0 z-30">
+            <div class="flex items-center space-x-3">
+                <div id="headerBankLogo" class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-md">
+                    KB
+                </div>
+                <div>
+                    <span id="headerUserName" class="text-base font-bold text-slate-100">한윤성님</span>
+                    <span id="headerBankName" class="block text-[11px] text-slate-400 font-medium">KB국민은행</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="toggleAudio()" id="audioBtn" title="효과음 토글" class="p-2.5 rounded-full bg-slate-900 text-slate-400 hover:text-white transition">
+                    <i data-lucide="volume-2" class="w-4 h-4"></i>
+                </button>
+                <button onclick="openAddAccountModal()" title="계좌 추가" class="p-2.5 rounded-full bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- 메인 콘텐츠 영역 -->
+        <main class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+
+            <!-- 총 자산 카드 -->
+            <div class="bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                <div class="absolute -right-6 -top-6 w-28 h-28 bg-blue-600/10 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="flex justify-between items-center text-slate-400 text-xs font-medium mb-1">
+                    <span>총 자산 잔액</span>
+                    <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">실시간 연동</span>
+                </div>
+                <div class="flex items-baseline space-x-1 mb-4">
+                    <span class="text-2xl font-bold text-blue-400">₩</span>
+                    <!-- 스무스하게 수치가 변경되는 총 잔액 -->
+                    <span id="totalBalanceText" class="text-3xl font-extrabold tracking-tight text-white">0</span>
+                </div>
+
+                <!-- 시뮬레이션 상태 바 -->
+                <div class="bg-slate-950/60 rounded-xl p-3 flex items-center justify-between border border-slate-800/60">
+                    <div class="flex items-center space-x-2.5">
+                        <span class="relative flex h-3 w-3">
+                            <span id="statusPing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span id="statusDot" class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        </span>
+                        <div>
+                            <div class="text-xs font-semibold text-slate-200" id="simStatusText">실시간 입출금 작동 중</div>
+                            <div class="text-[10px] text-slate-500" id="simRateText">2.0초 간격 무작위 거래 발생</div>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="simToggle" class="sr-only peer" checked onchange="toggleSimulation()">
+                        <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 계좌 목록 섹션 -->
+            <div>
+                <div class="flex items-center justify-between mb-2.5 px-1">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">내 계좌 목록</h2>
+                    <button onclick="openAddAccountModal()" class="text-xs text-blue-400 font-semibold hover:underline flex items-center space-x-1">
+                        <span>+ 계좌 추가</span>
+                    </button>
+                </div>
+                <div id="accountsList" class="space-y-2.5">
+                    <!-- 계좌 카드가 JS로 동적 생성됩니다 -->
+                </div>
+            </div>
+
+            <!-- 시뮬레이션 속도 조절 및 수동 입출금 컨트롤 -->
+            <div class="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-400 font-medium">자동 거래 생성 속도</span>
+                    <span id="speedLabel" class="text-blue-400 font-bold">보통 (2.0초)</span>
+                </div>
+                <input type="range" id="speedRange" min="500" max="4000" step="250" value="2000" oninput="updateSpeed(this.value)" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                <div class="flex space-x-2 pt-1">
+                    <button onclick="triggerManualTransaction('deposit')" class="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 py-2 rounded-xl text-xs font-semibold transition active:scale-95">
+                        + 수동 입금 테스트
+                    </button>
+                    <button onclick="triggerManualTransaction('withdraw')" class="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 py-2 rounded-xl text-xs font-semibold transition active:scale-95">
+                        - 수동 출금 테스트
+                    </button>
+                </div>
+            </div>
+
+            <!-- 실시간 거래 내역 리스트 -->
+            <div>
+                <div class="flex items-center justify-between mb-2 px-1">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">실시간 통장 거래 내역</h2>
+                    <span class="text-[10px] text-slate-500" id="txCountText">0건의 거래</span>
+                </div>
+                <div id="txHistory" class="space-y-2 pb-6">
+                    <div class="text-center py-8 text-slate-600 text-xs">
+                        거래 내역이 아직 없습니다.
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- 신규 계좌 생성 모달 -->
+    <div id="addAccountModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-base font-bold text-white">신규 계좌 추가</h3>
+                <button onclick="closeAddAccountModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">계좌 이름</label>
+                    <input type="text" id="newAccountName" placeholder="예: 비상금 파킹통장" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">초기 잔액 (원)</label>
+                    <input type="number" id="newAccountBalance" placeholder="예: 100000" value="50000" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+            <div class="flex space-x-2 pt-2">
+                <button onclick="closeAddAccountModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl text-xs font-semibold">취소</button>
+                <button onclick="confirmAddAccount()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-semibold">계좌 개설</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스크립트 로직 -->
+    <script>
+        // 은행 데이터베이스
+        const BANKS = [
+            { id: 'kb', name: 'KB국민은행', code: 'KB', color: 'bg-amber-500 text-slate-950' },
+            { id: 'shinhan', name: '신한은행', code: '신한', color: 'bg-blue-600 text-white' },
+            { id: 'hana', name: '하나은행', code: '하나', color: 'bg-emerald-600 text-white' },
+            { id: 'woori', name: '우리은행', code: '우리', color: 'bg-cyan-600 text-white' },
+            { id: 'kakao', name: '카카오뱅크', code: '카카오', color: 'bg-yellow-400 text-slate-900' },
+            { id: 'toss', name: '토스뱅크', code: '토스', color: 'bg-blue-500 text-white' },
+            { id: 'nh', name: 'NH농협은행', code: 'NH', color: 'bg-green-600 text-white' },
+            { id: 'ibk', name: 'IBK기업은행', code: 'IBK', color: 'bg-indigo-600 text-white' }
+        ];
+
+        // 랜덤 거래처 데이터
+        const DEPOSIT_SENDERS = ["김철수", "이영희", "국세청 환급금", "배달의민족 정산", "주식회사 급여", "예금 이자", "중고거래 입금", "박민수", "네이버페이 포인트", "카카오페이 환불", "당근마켓 거래", "청년지원금"];
+        const WITHDRAW_RECEIVERS = ["CU 편의점", "GS25 편의점", "카카오 T 택시", "스타벅스 코리아", "넷플릭스 구독료", "쿠팡 자동결제", "메가커피", "지하철 후불교통", "올리브영", "파리바게뜨"];
+
+        // 상태 관리
+        let selectedBank = BANKS[0];
+        let userName = "한윤성";
+        let isSimulating = true;
+        let simInterval = null;
+        let simSpeed = 2000;
+        let audioEnabled = true;
+
+        // 계좌 정보 (실제 수치와 애니메이션용 수치를 함께 관리)
+        let accounts = [
+            { id: 'acc-1', name: '입출금 통장', number: '352-0192-8821-02', balance: 1540000, targetBalance: 1540000 },
+            { id: 'acc-2', name: '자유 적금 통장', number: '1002-883-912033', balance: 5000000, targetBalance: 5000000 },
+            { id: 'acc-3', name: '비상금 파킹통장', number: '777-01-294812', balance: 350000, targetBalance: 350000 }
+        ];
+
+        let totalBalance = 0;
+        let targetTotalBalance = 0;
+        let transactions = [];
+
+        // 오디오 효과음 (Web Audio API)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playBeep(isDeposit) {
+            if (!audioEnabled || !audioCtx) return;
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (isDeposit) {
+                    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+                    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // A5
+                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                } else {
+                    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.12);
+                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                }
+            } catch(e) {}
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const btn = document.getElementById('audioBtn');
+            btn.innerHTML = audioEnabled 
+                ? '<i data-lucide="volume-2" class="w-4 h-4"></i>' 
+                : '<i data-lucide="volume-x" class="w-4 h-4 text-rose-400"></i>';
+            lucide.createIcons();
+        }
+
+        // 초기화
+        window.onload = function() {
+            renderBankGrid();
+            calculateTotals(true);
+            renderAccounts();
+            startSmoothCounterLoop();
+            startSimulation();
+            lucide.createIcons();
+        };
+
+        function renderBankGrid() {
+            const grid = document.getElementById('bankGrid');
+            grid.innerHTML = BANKS.map(bank => `
+                <div onclick="selectBank('${bank.id}')" id="bank-opt-${bank.id}" class="bank-option p-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 cursor-pointer flex items-center space-x-2.5 transition">
+                    <div class="w-7 h-7 rounded-lg ${bank.color} font-bold text-xs flex items-center justify-center shrink-0">
+                        ${bank.code}
+                    </div>
+                    <span class="text-xs font-semibold text-slate-200 truncate">${bank.name}</span>
+                </div>
+            `).join('');
+            selectBank('kb');
+        }
+
+        function selectBank(bankId) {
+            selectedBank = BANKS.find(b => b.id === bankId);
+            document.querySelectorAll('.bank-option').forEach(el => el.classList.remove('border-blue-500', 'bg-blue-600/10'));
+            const activeEl = document.getElementById(`bank-opt-${bankId}`);
+            if (activeEl) activeEl.classList.add('border-blue-500', 'bg-blue-600/10');
+        }
+
+        function completeSetup() {
+            const nameInput = document.getElementById('inputUserName').value.trim();
+            if (nameInput) userName = nameInput;
+
+            document.getElementById('headerUserName').innerText = `${userName}님`;
+            document.getElementById('headerBankName').innerText = selectedBank.name;
+            
+            const logoEl = document.getElementById('headerBankLogo');
+            logoEl.className = `w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-md ${selectedBank.color}`;
+            logoEl.innerText = selectedBank.code;
+
+            document.getElementById('setupModal').classList.add('hidden');
+        }
+
+        // --- 부드러운 잔액 변경 애니메이션 (Lerp 기반 requestAnimationFrame) ---
+        function startSmoothCounterLoop() {
+            function update() {
+                // 총 잔액 부드러운 보간
+                if (Math.abs(totalBalance - targetTotalBalance) > 0.5) {
+                    totalBalance += (targetTotalBalance - totalBalance) * 0.12;
+                } else {
+                    totalBalance = targetTotalBalance;
+                }
+                document.getElementById('totalBalanceText').innerText = Math.round(totalBalance).toLocaleString('ko-KR');
+
+                // 각 계좌별 잔액 부드러운 보간
+                accounts.forEach(acc => {
+                    if (Math.abs(acc.balance - acc.targetBalance) > 0.5) {
+                        acc.balance += (acc.targetBalance - acc.balance) * 0.12;
+                    } else {
+                        acc.balance = acc.targetBalance;
+                    }
+                    const balEl = document.getElementById(`bal-${acc.id}`);
+                    if (balEl) {
+                        balEl.innerText = Math.round(acc.balance).toLocaleString('ko-KR') + ' 원';
+                    }
+                });
+
+                requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
+        function calculateTotals(instant = false) {
+            targetTotalBalance = accounts.reduce((sum, acc) => sum + acc.targetBalance, 0);
+            if (instant) totalBalance = targetTotalBalance;
+        }
+
+        // 계좌 UI 렌더링
+        function renderAccounts() {
+            const list = document.getElementById('accountsList');
+            list.innerHTML = accounts.map(acc => `
+                <div id="card-${acc.id}" class="bg-slate-900 border border-slate-800/80 rounded-xl p-4 transition-all duration-300">
+                    <div class="flex justify-between items-start mb-1.5">
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">${acc.name}</div>
+                            <div class="text-[10px] text-slate-500 font-mono tracking-wider">${acc.number}</div>
+                        </div>
+                        <span class="text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full font-medium">${selectedBank.name}</span>
+                    </div>
+                    <div class="text-right">
+                        <span id="bal-${acc.id}" class="text-lg font-bold text-slate-100 font-mono">
+                            ${Math.round(acc.balance).toLocaleString('ko-KR')} 원
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 시뮬레이션 제어
+        function startSimulation() {
+            if (simInterval) clearInterval(simInterval);
+            simInterval = setInterval(runRandomTransaction, simSpeed);
+        }
+
+        function toggleSimulation() {
+            const checked = document.getElementById('simToggle').checked;
+            isSimulating = checked;
+            const ping = document.getElementById('statusPing');
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('simStatusText');
+
+            if (isSimulating) {
+                ping.classList.remove('hidden');
+                dot.className = 'relative inline-flex rounded-full h-3 w-3 bg-emerald-500';
+                text.innerText = '실시간 입출금 작동 중';
+                startSimulation();
+            } else {
+                ping.classList.add('hidden');
+                dot.className = 'relative inline-flex rounded-full h-3 w-3 bg-slate-600';
+                text.innerText = '실시간 입출금 일시정지됨';
+                if (simInterval) clearInterval(simInterval);
+            }
+        }
+
+        function updateSpeed(val) {
+            simSpeed = parseInt(val);
+            document.getElementById('speedLabel').innerText = `${(simSpeed / 1000).toFixed(1)}초 간격`;
+            document.getElementById('simRateText').innerText = `${(simSpeed / 1000).toFixed(1)}초 간격 무작위 거래 발생`;
+            if (isSimulating) startSimulation();
+        }
+
+        // 무작위 거래 로직 (99% 입금 / 1% 소액 출금)
+        function runRandomTransaction() {
+            if (!isSimulating || accounts.length === 0) return;
+
+            const isWithdrawal = Math.random() < 0.01; // 1% 확률
+            const targetAccount = accounts[Math.floor(Math.random() * accounts.length)];
+
+            if (isWithdrawal) {
+                // 1% 소액 출금 (1,000원 ~ 20,000원)
+                const amount = Math.floor(Math.random() * 20 + 1) * 1000;
+                const receiver = WITHDRAW_RECEIVERS[Math.floor(Math.random() * WITHDRAW_RECEIVERS.length)];
+                processTransaction(targetAccount, 'withdraw', amount, receiver);
+            } else {
+                // 99% 일반 입금 (5,000원 ~ 150,000원)
+                const amount = Math.floor(Math.random() * 30 + 1) * 5000;
+                const sender = DEPOSIT_SENDERS[Math.floor(Math.random() * DEPOSIT_SENDERS.length)];
+                processTransaction(targetAccount, 'deposit', amount, sender);
+            }
+        }
+
+        function triggerManualTransaction(type) {
+            if (accounts.length === 0) return;
+            const targetAccount = accounts[0];
+            if (type === 'deposit') {
+                const amount = Math.floor(Math.random() * 20 + 1) * 10000;
+                processTransaction(targetAccount, 'deposit', amount, '수동 입금 테스트');
+            } else {
+                const amount = Math.floor(Math.random() * 10 + 1) * 2000;
+                processTransaction(targetAccount, 'withdraw', amount, '수동 출금 테스트');
+            }
+        }
+
+        function processTransaction(account, type, amount, partyName) {
+            if (type === 'withdraw') {
+                if (account.targetBalance < amount) return; // 잔액 부족 방지
+                account.targetBalance -= amount;
+            } else {
+                account.targetBalance += amount;
+            }
+
+            calculateTotals(false);
+            playBeep(type === 'deposit');
+
+            // 계좌 카드 반짝임 효과
+            const cardEl = document.getElementById(`card-${account.id}`);
+            if (cardEl) {
+                const glowClass = type === 'deposit' ? 'glow-green' : 'glow-red';
+                cardEl.classList.remove('glow-green', 'glow-red');
+                void cardEl.offsetWidth; // 리플로우 강제
+                cardEl.classList.add(glowClass);
+            }
+
+            // 거래 데이터 기록
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            
+            const tx = {
+                id: 'tx-' + Date.now() + '-' + Math.random(),
+                time: timeStr,
+                accountName: account.name,
+                type: type,
+                party: partyName,
+                amount: amount,
+                afterBalance: account.targetBalance
+            };
+
+            transactions.unshift(tx);
+            if (transactions.length > 30) transactions.pop(); // 최근 30개 보존
+
+            renderTransactions();
+        }
+
+        // 거래 내역 리스트 렌더링
+        function renderTransactions() {
+            const container = document.getElementById('txHistory');
+            document.getElementById('txCountText').innerText = `${transactions.length}건의 거래`;
+
+            if (transactions.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-slate-600 text-xs">거래 내역이 아직 없습니다.</div>';
+                return;
+            }
+
+            container.innerHTML = transactions.map((tx, idx) => {
+                const isDeposit = tx.type === 'deposit';
+                const colorClass = isDeposit ? 'text-emerald-400' : 'text-rose-500';
+                const sign = isDeposit ? '+' : '-';
+                const badgeBg = isDeposit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400';
+                const isLatest = idx === 0;
+
+                return `
+                    <div class="bg-slate-900/80 border border-slate-800/60 rounded-xl p-3 flex items-center justify-between transition-all duration-300 ${isLatest ? 'border-slate-700 bg-slate-900' : ''}">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-xl ${badgeBg} flex items-center justify-center text-xs font-bold shrink-0">
+                                ${isDeposit ? '입금' : '출금'}
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-slate-200">${tx.party}</div>
+                                <div class="text-[10px] text-slate-500 flex items-center space-x-1">
+                                    <span>${tx.time}</span>
+                                    <span>•</span>
+                                    <span>${tx.accountName}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs font-bold ${colorClass} font-mono">
+                                ${sign}₩${tx.amount.toLocaleString('ko-KR')}
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono">
+                                잔액 ₩${Math.round(tx.afterBalance).toLocaleString('ko-KR')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 계좌 개설 모달 핸들러
+        function openAddAccountModal() {
+            document.getElementById('addAccountModal').classList.remove('hidden');
+        }
+
+        function closeAddAccountModal() {
+            document.getElementById('addAccountModal').classList.add('hidden');
+        }
+
+        function confirmAddAccount() {
+            const name = document.getElementById('newAccountName').value.trim() || '신규 통장';
+            const initialBalance = parseInt(document.getElementById('newAccountBalance').value) || 0;
+
+            const newAcc = {
+                id: 'acc-' + Date.now(),
+                name: name,
+                number: `${Math.floor(100+Math.random()*899)}-${Math.floor(1000+Math.random()*8999)}-${Math.floor(1000+Math.random()*8999)}`,
+                balance: initialBalance,
+                targetBalance: initialBalance
+            };
+
+            accounts.push(newAcc);
+            calculateTotals(false);
+            renderAccounts();
+            closeAddAccountModal();
+
+            document.getElementById('newAccountName').value = '';
+            document.getElementById('newAccountBalance').value = '50000';
+        }
+    </script>
+</body>
+</html>
